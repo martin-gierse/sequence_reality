@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sequence Reality</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <script src="https://unpkg.com/wavesurfer.js@7.7.12/dist/wavesurfer.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="p-4 md:p-8">
+    <div class="container mx-auto max-w-5xl p-6 rounded-lg">
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl font-bold">Sequence <span class="headline-accent">Reality</span></h1>
+            <p class="text-muted-cyber">Your world is an instrument. Press record.</p>
+        </header>
+
+        <section id="controls" class="mb-8 p-4 rounded-lg section-bg">
+            <h2 class="text-2xl font-semibold mb-4">SYSTEM INTERFACE</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+                
+                <div class="flex flex-col space-y-3 justify-center">
+                    <button id="recordSampleButton" class="py-2 px-4 flex items-center justify-center">
+                        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2" fill="#ff0000">
+                             <circle cx="50" cy="50" r="45"/>
+                        </svg>
+                        RECORD YOUR SAMPLE
+                    </button>
+                    <p id="recordingStatus" class="text-sm text-center text-muted-cyber"></p>
+                </div>
+                
+                <div class="flex flex-col space-y-3 justify-center">
+                    <div class="flex items-center justify-between gap-4">
+                        <label for="tempo" class="block text-sm font-medium whitespace-nowrap">CHRONOSYNC (BPM):</label>
+                        <input type="number" id="tempo" value="120" min="40" max="240"
+                            class="block w-full max-w-[100px] px-3 py-2 shadow-sm sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="micSelect" class="block text-sm font-medium">INPUT DEVICE:</label>
+                        <div class="flex gap-2 items-center mt-1">
+                            <select id="micSelect"
+                                class="mt-1 block w-full px-3 py-2 bg-black/40 shadow-sm sm:text-sm"></select>
+                            <button id="refreshDevicesButton" class="py-2 px-3 text-xs"
+                                title="Refresh input devices">REFRESH</button>
+                        </div>
+                        <p id="permissionStatus" class="text-xs text-muted-cyber mt-1"></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <section id="sampleLibrary" class="md:col-span-1 p-4 rounded-lg section-bg">
+                <h2 class="text-xl font-semibold mb-4">SAMPLE BAY</h2>
+                <div id="sampleList" class="space-y-2 max-h-96 overflow-y-auto pr-2">
+                    <p class="text-muted-cyber p-2">No samples acquired. Press record.</p>
+                </div>
+                <div class="mt-4 flex gap-2">
+                    <button id="exportStemsButton" class="py-2 px-3 text-xs"
+                        title="Export active pattern as individual stems">EXPORT STEMS</button>
+                    <button id="exportMixButton" class="py-2 px-3 text-xs" title="Export full mix as WAV">EXPORT
+                        MIX</button>
+                    <a id="exportDownloadLink" class="hidden"></a>
+                </div>
+            </section>
+
+            <section id="sequencer" class="md:col-span-2 p-4 rounded-lg section-bg">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-xl font-semibold">SEQUENCER</h2>
+                    <div class="flex gap-2">
+                        <button id="playButton" class="transport-button" title="Play">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                                stroke="currentColor" class="w-6 h-6">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+                            </svg>
+                        </button>
+                        <button id="stopButton" class="transport-button" title="Stop" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                                stroke="currentColor" class="w-6 h-6">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="sequencerGrid" class="overflow-x-auto">
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div id="sampleModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close-button" id="closeModalButton">&times;</span>
+            <h3 class="text-xl font-medium mb-4">LOAD SAMPLE</h3>
+            <div id="modalSampleList" class="space-y-2 max-h-60 overflow-y-auto pr-2">
+            </div>
+            <p id="modalNoSamples" class="text-muted-cyber hidden">Sample bay empty.</p>
+        </div>
+    </div>
+
+    <div id="editorModal" class="modal">
+        <div class="modal-content">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-xl font-medium">SAMPLE SURGERY</h3>
+                <span class="modal-close-button" id="editorCloseButton">&times;</span>
+            </div>
+            <p id="editorSampleName" class="text-sm text-muted-cyber mb-3"></p>
+            <div id="waveformContainer" class="rounded-sm relative">
+                <div id="selectionOverlay"></div>
+                <div id="startMarker" class="hidden"></div>
+                <div id="endMarker" class="hidden"></div>
+            </div>
+            <div class="flex flex-col gap-3 mt-3">
+                <div class="flex items-center gap-2">
+                    <button id="trimApplyButton" class="editor-control-button py-1 px-3 text-xs">APPLY TRIM</button>
+                    <button id="trimResetButton" class="editor-control-button py-1 px-3 text-xs">RESET TRIM</button>
+                    <button id="zoomInButton" class="editor-control-button py-1 px-3 text-xs">ZOOM +</button>
+                    <button id="zoomOutButton" class="editor-control-button py-1 px-3 text-xs">ZOOM −</button>
+                </div>
+                 <div class="flex items-center gap-2">
+                    <button id="renameButton" class="editor-control-button py-1 px-3 text-xs">RENAME</button>
+                    <button id="pitchDownButton" class="editor-control-button py-1 px-3 text-xs">PITCH −</button>
+                    <button id="pitchUpButton" class="editor-control-button py-1 px-3 text-xs">PITCH +</button>
+                    <button id="previewButton" class="editor-control-button py-1 px-3 text-xs">PREVIEW</button>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span id="trimInfo" class="text-xs text-muted-cyber"></span>
+                    <span id="pitchInfo" class="text-xs text-muted-cyber font-bold"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="messageArea" class="fixed bottom-4 right-4 p-4 rounded-md shadow-md hidden animate-pulse text-sm">
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
