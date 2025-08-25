@@ -119,7 +119,7 @@
         <div class="modal-content">
             <div class="flex items-center justify-between mb-2">
                 <h3 class="text-xl font-medium">SAMPLE SURGERY</h3>
-                <span class="modal-close-button" id="editorCloseButton">&times;</span>
+                <span id="editorCloseButton" class="modal-close-button" title="Discard Changes">&times;</span>
             </div>
             <p id="editorSampleName" class="text-sm text-muted-cyber mb-3"></p>
             <div id="waveformContainer" class="rounded-sm relative">
@@ -127,7 +127,7 @@
                 <div id="startMarker" class="hidden"></div>
                 <div id="endMarker" class="hidden"></div>
             </div>
-            <p id="editorInstructions" class="text-center text-sm text-muted-cyber mt-2"></p>
+            <p id="editorInstructions" class="text-center text-sm text-muted-cyber mt-2 h-4"></p>
             <div class="flex flex-col gap-3 mt-3">
                 <div class="editor-controls-row flex items-center gap-2">
                     <button id="renameButton" class="editor-control-button py-1 px-3 text-xs">RENAME</button>
@@ -135,16 +135,17 @@
                     <button id="pitchDownButton" class="editor-control-button py-1 px-3 text-xs">PITCH −</button>
                     <button id="pitchUpButton" class="editor-control-button py-1 px-3 text-xs">PITCH +</button>
                 </div>
-                <div class="editor-controls-row flex items-center gap-2">
+                 <div class="editor-controls-row flex items-center gap-2">
                     <button id="trimApplyButton" class="editor-control-button py-1 px-3 text-xs">APPLY TRIM</button>
-                    <button id="trimResetButton" class="editor-control-button py-1 px-3 text-xs">RESET TRIM</button>
-                    <button id="zoomInButton" class="editor-control-button py-1 px-3 text-xs">ZOOM IN</button>
-                    <button id="zoomOutButton" class="editor-control-button py-1 px-3 text-xs">ZOOM OUT</button>
-                    <button id="zoomResetButton" class="editor-control-button py-1 px-3 text-xs">RESET ZOOM</button>
+                    <button id="trimResetButton" class="editor-control-button py-1 px-3 text-xs">RESET SAMPLE</button>
                 </div>
                 <div class="flex justify-between items-center mt-2">
                     <span id="trimInfo" class="text-xs text-muted-cyber"></span>
                     <span id="pitchInfo" class="text-xs text-muted-cyber font-bold"></span>
+                </div>
+                 <div class="flex items-center gap-2 mt-4">
+                    <button id="cancelButton" class="editor-main-button py-2 px-4 text-xs">CANCEL</button>
+                    <button id="saveButton" class="editor-main-button py-2 px-4 text-xs flex-grow">SAVE CHANGES</button>
                 </div>
             </div>
         </div>
