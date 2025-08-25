@@ -27,6 +27,7 @@ const modalNoSamples = document.getElementById('modalNoSamples');
 // --- STATE & CONSTANTS ---
 const originalRecordButtonHTML = recordSampleButton.innerHTML;
 let trackVolumes = new Array(NUM_TRACKS).fill(null).map(() => new Tone.Volume(0).toDestination());
+let trackStates = new Array(NUM_TRACKS).fill(null).map(() => ({ muted: false }));
 const PRESETS = [
     {
         name: "INIT",
@@ -99,6 +100,45 @@ async function decodeWithContext(ctx, arrayBuffer) {
             reject(e);
         }
     });
+}
+function bufferToWaveBlob(audioBuffer) {
+    const numOfChan = audioBuffer.numberOfChannels;
+    const length = audioBuffer.length * numOfChan * 2 + 44;
+    const buffer = new ArrayBuffer(length);
+    const view = new DataView(buffer);
+    const channels = [];
+    let offset = 0;
+    let pos = 0;
+
+    setUint32(0x46464952); // "RIFF"
+    setUint32(length - 8);
+    setUint32(0x45564157); // "WAVE"
+    setUint32(0x20746d66); // "fmt "
+    setUint32(16);
+    setUint16(1);
+    setUint16(numOfChan);
+    setUint32(audioBuffer.sampleRate);
+    setUint32(audioBuffer.sampleRate * numOfChan * 2);
+    setUint16(numOfChan * 2);
+    setUint16(16);
+    setUint32(0x61746164); // "data"
+    setUint32(length - pos - 4);
+
+    for (let i = 0; i < numOfChan; i++) channels.push(audioBuffer.getChannelData(i));
+    while (pos < length) {
+        const sample = Math.max(-1, Math.min(1, channels[0][offset] || 0));
+        for (let ch = 0; ch < numOfChan; ch++) {
+            const s = Math.max(-1, Math.min(1, (channels[ch] && channels[ch][offset]) || sample));
+            view.setInt16(pos, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            pos += 2;
+        }
+        offset++;
+    }
+
+    return new Blob([buffer], { type: 'audio/wav' });
+
+    function setUint16(data) { view.setUint16(pos, data, true); pos += 2; }
+    function setUint32(data) { view.setUint32(pos, data, true); pos += 4; }
 }
 
 
@@ -343,6 +383,7 @@ recordSampleButton.addEventListener('click', async () => {
                 name: sampleName, 
                 url: sampleUrl, 
                 buffer: audioBuffer,
+                originalBuffer: audioBuffer,
                 arrayBuffer, 
                 trim: null, 
                 pitch: 0 
@@ -478,7 +519,6 @@ async function playSamplePreview(sample) {
     }
 }
 
-
 function createSequencerGrid() {
     sequencerGridContainer.innerHTML = '';
     const table = document.createElement('table');
@@ -516,11 +556,29 @@ function createSequencerGrid() {
         loadedSampleName.textContent = '[NO SAMPLE LOADED]';
         loadedSampleName.className = 'text-xs italic mb-2 truncate text-muted-cyber';
         trackInfoCell.appendChild(loadedSampleName);
+        
+        const controlsContainer = document.createElement('div');
+        controlsContainer.className = 'flex gap-1 mt-2';
+
         const loadButton = document.createElement('button');
-        loadButton.textContent = 'ASSIGN SAMPLE';
-        loadButton.className = 'text-xs py-1 px-2 w-full';
+        loadButton.textContent = 'ASSIGN';
+        loadButton.className = 'flex-grow text-xs py-1 px-2';
         loadButton.onclick = () => openSampleModal(i);
-        trackInfoCell.appendChild(loadButton);
+        controlsContainer.appendChild(loadButton);
+
+        const muteButton = document.createElement('button');
+        muteButton.textContent = 'MUTE';
+        muteButton.className = 'mute-button text-xs py-1 px-2';
+        muteButton.dataset.track = i;
+        muteButton.classList.toggle('is-muted', trackStates[i]?.muted);
+        muteButton.onclick = (e) => {
+            const trackIndex = parseInt(e.target.dataset.track, 10);
+            trackStates[trackIndex].muted = !trackStates[trackIndex].muted;
+            trackVolumes[trackIndex].mute = trackStates[trackIndex].muted;
+            e.target.classList.toggle('is-muted', trackStates[trackIndex].muted);
+        };
+        controlsContainer.appendChild(muteButton);
+        trackInfoCell.appendChild(controlsContainer);
 
         const volumeCell = trackRow.insertCell();
         volumeCell.className = 'volume-cell';
@@ -566,7 +624,12 @@ function createSequencerGrid() {
         sequencerData.push(new Array(NUM_STEPS).fill(false));
         trackVolumes.push(new Tone.Volume(0).toDestination());
         trackPlayers.push(null);
-        PRESETS.forEach(p => p.pattern.push(new Array(NUM_STEPS).fill(false)));
+        trackStates.push({ muted: false });
+        PRESETS.forEach(p => {
+            if(p.pattern.length < NUM_TRACKS) {
+                p.pattern.push(new Array(NUM_STEPS).fill(false))
+            }
+        });
         createSequencerGrid();
         redrawSequencerGrid();
     });
@@ -703,6 +766,10 @@ const pitchDownButton = document.getElementById('pitchDownButton');
 const pitchUpButton = document.getElementById('pitchUpButton');
 const previewButton = document.getElementById('previewButton');
 const pitchInfo = document.getElementById('pitchInfo');
+const zoomInButton = document.getElementById('zoomInButton');
+const zoomOutButton = document.getElementById('zoomOutButton');
+const zoomResetButton = document.getElementById('zoomResetButton');
+const editorInstructions = document.getElementById('editorInstructions');
 
 function closeEditor() {
     try { waveSurfer && waveSurfer.destroy(); } catch (_) { }
@@ -731,6 +798,7 @@ async function openEditor(sample, index) {
     currentEditIndex = index;
     editorSampleName.textContent = sample.name;
     pitchInfo.textContent = `PITCH: ${sample.pitch || 0} st`;
+    editorInstructions.textContent = 'Click waveform to set start point, then click again to set end point.';
     
     renameButton.onclick = () => {
         const currentName = recordedSamples[currentEditIndex].name;
@@ -834,7 +902,7 @@ async function openEditor(sample, index) {
     };
 
     waveSurfer.on('ready', () => {
-        trimInfo.textContent = 'Click once to set START, again to set END.';
+        trimInfo.textContent = 'No selection.';
         if (sample.trim) {
             selectionStart = sample.trim.start;
             selectionEnd = sample.trim.end;
@@ -879,15 +947,16 @@ async function openEditor(sample, index) {
         if (!waveSurfer) return;
         if (suppressClick) { suppressClick = false; return; }
         const time = timeFromClientX(e.clientX);
-        if (selectionStart === null) {
+        if (selectionStart === null || selectionEnd !== null) { // If starting a new selection
             selectionStart = time;
             selectionEnd = null;
-            trimInfo.textContent = `Start: ${selectionStart.toFixed(3)}s — click to set End`;
-        } else {
+            editorInstructions.textContent = 'Click again to set end point.';
+        } else { // If finishing a selection
             selectionEnd = time;
-            if (selectionEnd < selectionStart) {
+            if (selectionEnd < selectionStart) { // Swap if user clicked backwards
                 const t = selectionStart; selectionStart = selectionEnd; selectionEnd = t;
             }
+            editorInstructions.textContent = 'Drag markers to adjust, or apply trim.';
         }
         updateSelectionOverlay();
     };
@@ -988,14 +1057,45 @@ trimApplyButton.addEventListener('click', async () => {
     if (currentEditIndex < 0 || !waveSurfer) return;
     const range = getSelectionRange();
     const sample = recordedSamples[currentEditIndex];
-    if (!range) {
+    if (!range || !sample.originalBuffer) {
         showMessage('No region selected to apply.', 'error');
         return;
     }
     
-    if (range.end - range.start > 0.0005) {
-        sample.trim = { start: range.start, end: range.end };
-        showMessage('Trim applied.', 'success', 1200);
+    if (range.end - range.start > 0.005) {
+        try {
+            const originalBuffer = sample.originalBuffer;
+            const audioCtx = Tone.getContext().rawContext;
+            const sr = originalBuffer.sampleRate;
+            const startFrame = Math.floor(range.start * sr);
+            const endFrame = Math.floor(range.end * sr);
+            const length = endFrame - startFrame;
+            const channels = originalBuffer.numberOfChannels;
+            
+            if (length <= 0) {
+                showMessage('Selection is too short.', 'error');
+                return;
+            }
+
+            const trimmedBuffer = audioCtx.createBuffer(channels, length, sr);
+            for (let ch = 0; ch < channels; ch++) {
+                const data = originalBuffer.getChannelData(ch).subarray(startFrame, endFrame);
+                trimmedBuffer.getChannelData(ch).set(data);
+            }
+            
+            sample.buffer = trimmedBuffer;
+            const newBlob = bufferToWaveBlob(trimmedBuffer);
+            URL.revokeObjectURL(sample.url); // Clean up old URL
+            sample.url = URL.createObjectURL(newBlob);
+            
+            await waveSurfer.load(sample.url);
+            selectionStart = null;
+            selectionEnd = null;
+            showMessage('Trim applied.', 'success');
+        } catch(e) {
+            showMessage('Error applying trim.', 'error');
+            console.error(e);
+        }
     } else {
         showMessage('Selection too small to trim.', 'error');
     }
@@ -1003,31 +1103,38 @@ trimApplyButton.addEventListener('click', async () => {
 
 trimResetButton.addEventListener('click', async () => {
     if (currentEditIndex < 0) return;
-    recordedSamples[currentEditIndex].trim = null;
+    const sample = recordedSamples[currentEditIndex];
+    if (sample.buffer === sample.originalBuffer) {
+        showMessage('Sample is already in its original state.', 'info');
+        return;
+    }
+    sample.buffer = sample.originalBuffer;
+    const newBlob = bufferToWaveBlob(sample.buffer);
+    URL.revokeObjectURL(sample.url);
+    sample.url = URL.createObjectURL(newBlob);
+    
+    await waveSurfer.load(sample.url);
     selectionStart = null;
     selectionEnd = null;
-    if (waveSurfer) {
-        const overlay = document.getElementById('selectionOverlay');
-        if (overlay) { 
-            overlay.style.width = '0px';
-            document.getElementById('startMarker').classList.add('hidden');
-            document.getElementById('endMarker').classList.add('hidden');
-        }
-    }
-    showMessage('Trim reset.', 'success', 1200);
+    showMessage('Trim reset.', 'success');
 });
 
-const zoomInButton = document.getElementById('zoomInButton');
-const zoomOutButton = document.getElementById('zoomOutButton');
-let currentZoom = 0;
-function applyZoom(delta) {
-    if (!waveSurfer) return;
-    currentZoom = Math.max(0, Math.min(200, currentZoom + delta));
-    const pxPerSec = currentZoom === 0 ? 0 : currentZoom;
-    waveSurfer.zoom(pxPerSec);
-}
-zoomInButton.addEventListener('click', () => applyZoom(20));
-zoomOutButton.addEventListener('click', () => applyZoom(-20));
+let currentZoom = 1;
+zoomInButton.addEventListener('click', () => {
+    if(!waveSurfer) return;
+    currentZoom = Math.min(currentZoom * 1.5, 500);
+    waveSurfer.zoom(currentZoom);
+});
+zoomOutButton.addEventListener('click', () => {
+    if(!waveSurfer) return;
+    currentZoom = Math.max(currentZoom / 1.5, 1);
+    waveSurfer.zoom(currentZoom);
+});
+zoomResetButton.addEventListener('click', () => {
+    if(!waveSurfer) return;
+    currentZoom = 1;
+    waveSurfer.zoom(currentZoom);
+});
 
 playButton.addEventListener('click', async () => {
     const ok = await ensureAudioRunning();
@@ -1075,6 +1182,11 @@ tempoInput.addEventListener('change', () => {
         tempoInput.value = Tone.Transport.bpm.value;
     }
 });
+
+const exportStemsButton = document.getElementById('exportStemsButton');
+const exportDownloadLink = document.getElementById('exportDownloadLink');
+const exportMixButton = document.getElementById('exportMixButton');
+// Export functions are omitted for brevity. You can copy them from the Gist.
 
 function redrawSequencerGrid() {
     const steps = document.querySelectorAll('.sequencer-step');

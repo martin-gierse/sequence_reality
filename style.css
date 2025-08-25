@@ -498,6 +498,20 @@ select {
     flex-wrap: wrap;
 }
 
+.mute-button {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.7rem;
+    line-height: 1;
+    border-color: var(--color-text-muted);
+    color: var(--color-text-muted);
+}
+.mute-button.is-muted {
+    border-color: var(--color-accent-red);
+    background-color: var(--color-accent-red);
+    color: var(--color-text);
+}
+
+
 @media (max-width: 768px) {
     .sequencer-header-main {
         flex-direction: column;

@@ -25,7 +25,6 @@
         <section id="controls" class="mb-8 p-4 rounded-lg section-bg">
             <h2 class="text-2xl font-semibold mb-4">SYSTEM INTERFACE</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-                
                 <div class="flex flex-col space-y-3 justify-center">
                     <button id="recordSampleButton" class="py-2 px-4 flex items-center justify-center">
                         <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2" fill="#ff0000">
@@ -35,7 +34,6 @@
                     </button>
                     <p id="recordingStatus" class="text-sm text-center text-muted-cyber"></p>
                 </div>
-                
                 <div class="flex flex-col space-y-3 justify-center">
                     <div>
                         <label for="micSelect" class="block text-sm font-medium">INPUT DEVICE:</label>
@@ -83,7 +81,7 @@
                             <label for="tempo">BPM</label>
                             <input type="number" id="tempo" value="120" min="40" max="240">
                         </div>
-                         <div class="flex gap-2">
+                        <div class="flex gap-2">
                             <button id="playButton" class="transport-button" title="Play">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
                                     stroke="currentColor" class="w-6 h-6">
@@ -129,20 +127,22 @@
                 <div id="startMarker" class="hidden"></div>
                 <div id="endMarker" class="hidden"></div>
             </div>
+            <p id="editorInstructions" class="text-center text-sm text-muted-cyber mt-2"></p>
             <div class="flex flex-col gap-3 mt-3">
+                <div class="editor-controls-row flex items-center gap-2">
+                    <button id="renameButton" class="editor-control-button py-1 px-3 text-xs">RENAME</button>
+                    <button id="previewButton" class="editor-control-button py-1 px-3 text-xs">PREVIEW</button>
+                    <button id="pitchDownButton" class="editor-control-button py-1 px-3 text-xs">PITCH −</button>
+                    <button id="pitchUpButton" class="editor-control-button py-1 px-3 text-xs">PITCH +</button>
+                </div>
                 <div class="editor-controls-row flex items-center gap-2">
                     <button id="trimApplyButton" class="editor-control-button py-1 px-3 text-xs">APPLY TRIM</button>
                     <button id="trimResetButton" class="editor-control-button py-1 px-3 text-xs">RESET TRIM</button>
-                    <button id="zoomInButton" class="editor-control-button py-1 px-3 text-xs">ZOOM +</button>
-                    <button id="zoomOutButton" class="editor-control-button py-1 px-3 text-xs">ZOOM −</button>
+                    <button id="zoomInButton" class="editor-control-button py-1 px-3 text-xs">ZOOM IN</button>
+                    <button id="zoomOutButton" class="editor-control-button py-1 px-3 text-xs">ZOOM OUT</button>
+                    <button id="zoomResetButton" class="editor-control-button py-1 px-3 text-xs">RESET ZOOM</button>
                 </div>
-                 <div class="editor-controls-row flex items-center gap-2">
-                    <button id="renameButton" class="editor-control-button py-1 px-3 text-xs">RENAME</button>
-                    <button id="pitchDownButton" class="editor-control-button py-1 px-3 text-xs">PITCH −</button>
-                    <button id="pitchUpButton" class="editor-control-button py-1 px-3 text-xs">PITCH +</button>
-                    <button id="previewButton" class="editor-control-button py-1 px-3 text-xs">PREVIEW</button>
-                </div>
-                <div class="flex justify-between items-center">
+                <div class="flex justify-between items-center mt-2">
                     <span id="trimInfo" class="text-xs text-muted-cyber"></span>
                     <span id="pitchInfo" class="text-xs text-muted-cyber font-bold"></span>
                 </div>
