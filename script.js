@@ -14,6 +14,9 @@ const messageArea = document.getElementById('messageArea');
 const micSelect = document.getElementById('micSelect');
 const refreshDevicesButton = document.getElementById('refreshDevicesButton');
 const permissionStatus = document.getElementById('permissionStatus');
+const prevPresetButton = document.getElementById('prevPresetButton');
+const nextPresetButton = document.getElementById('nextPresetButton');
+const presetNameDisplay = document.getElementById('presetNameDisplay');
 
 // Modal elements
 const sampleModal = document.getElementById('sampleModal');
@@ -24,6 +27,69 @@ const modalNoSamples = document.getElementById('modalNoSamples');
 // --- STATE & CONSTANTS ---
 const originalRecordButtonHTML = recordSampleButton.innerHTML;
 const trackVolumes = new Array(NUM_TRACKS).fill(null).map(() => new Tone.Volume(0).toDestination());
+const PRESETS = [
+    {
+        name: "INIT",
+        bpm: 120,
+        pattern: [
+            [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+            [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+            [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+            [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+        ]
+    },
+    {
+        name: "HOUSE",
+        bpm: 125,
+        pattern: [
+            [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
+            [false, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false],
+            [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
+            [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+        ]
+    },
+    {
+        name: "TECHNO",
+        bpm: 135,
+        pattern: [
+            [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
+            [false, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false],
+            [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+            [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true]
+        ]
+    },
+    {
+        name: "REGGAETON",
+        bpm: 95,
+        pattern: [
+            [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
+            [false, false, false, true, false, false, true, false, false, false, false, true, false, false, true, false],
+            [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+            [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+        ]
+    },
+    {
+        name: "HIP HOP",
+        bpm: 90,
+        pattern: [
+            [true, false, false, false, false, false, true, false, true, false, false, false, false, false, false, false],
+            [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
+            [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false],
+            [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+        ]
+    },
+    {
+        name: "DRUM & BASS",
+        bpm: 174,
+        pattern: [
+            [true, false, false, false, false, false, false, false, false, false, true, false, false, false, false, false],
+            [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
+            [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false],
+            [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+        ]
+    }
+];
+let currentPresetIndex = 0;
 
 
 // --- HELPER FUNCTIONS ---
@@ -281,7 +347,7 @@ recordSampleButton.addEventListener('click', async () => {
             recordedSamples.push({ 
                 name: sampleName, 
                 url: sampleUrl, 
-                buffer: audioBuffer, // Store the decoded AudioBuffer
+                buffer: audioBuffer,
                 arrayBuffer, 
                 trim: null, 
                 pitch: 0 
@@ -568,7 +634,7 @@ async function selectSampleForTrack(sample, sampleIndex) {
 let sequence;
 function setupSequencerPlayback() {
     if (sequence) {
-        sequence.dispose();
+        sequence.stop(0).dispose();
     }
     const stepsArray = Array.from(Array(NUM_STEPS).keys());
     sequence = new Tone.Sequence((time, step) => {
@@ -968,7 +1034,7 @@ playButton.addEventListener('click', async () => {
 
 stopButton.addEventListener('click', () => {
     Tone.Transport.stop();
-    trackPlayers.forEach(p => { if (p) p.stop(); }); // Stop all players immediately
+    trackPlayers.forEach(p => { if (p && !p.disposed) p.stop(); });
     if (sequence) {
         sequence.stop(0).dispose();
         sequence = null;
@@ -995,11 +1061,32 @@ tempoInput.addEventListener('change', () => {
 const exportStemsButton = document.getElementById('exportStemsButton');
 const exportDownloadLink = document.getElementById('exportDownloadLink');
 const exportMixButton = document.getElementById('exportMixButton');
-// ... (export functions are very long and unchanged, omitting for brevity)
+// ... export functions are unchanged and very long, so they are omitted for clarity. They can be pasted from a previous complete version.
+
+function redrawSequencerGrid() {
+    const steps = document.querySelectorAll('.sequencer-step');
+    steps.forEach(step => {
+        const track = parseInt(step.dataset.track, 10);
+        const stepIndex = parseInt(step.dataset.step, 10);
+        const isActive = sequencerData[track][stepIndex];
+        step.classList.toggle('active', isActive);
+    });
+}
+
+function loadPreset(index) {
+    const preset = PRESETS[index];
+    sequencerData = JSON.parse(JSON.stringify(preset.pattern)); // Deep copy
+    tempoInput.value = preset.bpm;
+    tempoInput.dispatchEvent(new Event('change'));
+    presetNameDisplay.textContent = preset.name;
+    redrawSequencerGrid();
+}
+
 
 window.onload = () => {
     createSequencerGrid();
     updateSampleList();
+    loadPreset(0);
 
     const startAudioButton = document.createElement('button');
     startAudioButton.id = 'startAudioContextButton';
@@ -1051,4 +1138,14 @@ window.onload = () => {
     } else {
         permissionStatus.textContent = 'Media devices API unavailable.';
     }
+
+    nextPresetButton.addEventListener('click', () => {
+        currentPresetIndex = (currentPresetIndex + 1) % PRESETS.length;
+        loadPreset(currentPresetIndex);
+    });
+    prevPresetButton.addEventListener('click', () => {
+        currentPresetIndex = (currentPresetIndex - 1 + PRESETS.length) % PRESETS.length;
+        loadPreset(currentPresetIndex);
+    });
 };
+
