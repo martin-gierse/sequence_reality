@@ -17,54 +17,47 @@
 
 <body class="p-4 md:p-8">
     <div class="container mx-auto max-w-5xl p-6 rounded-lg">
-        <header class="mb-8 text-center">
+        <header class="mb-4 text-center">
             <h1 class="text-4xl font-bold">Sequence <span class="headline-accent">Reality</span></h1>
             <p class="text-muted-cyber">Your world is an instrument. Press record.</p>
         </header>
 
-        <section id="controls" class="mb-8 p-4 rounded-lg section-bg">
-            <h2 class="text-2xl font-semibold mb-4">SYSTEM INTERFACE</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-                <div class="flex flex-col space-y-3 justify-center">
-                    <button id="recordSampleButton" class="py-2 px-4 flex items-center justify-center">
-                        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2" fill="#ff0000">
-                             <circle cx="50" cy="50" r="45"/>
-                        </svg>
-                        RECORD YOUR SAMPLE
-                    </button>
-                    <p id="recordingStatus" class="text-sm text-center text-muted-cyber"></p>
-                </div>
-                <div class="flex flex-col space-y-3 justify-center">
-                    <div>
+        <nav class="flex justify-center border-b border-[var(--color-border)] mb-6">
+            <button data-tab="sample" class="tab-button active">SAMPLE</button>
+            <button data-tab="sequencer" class="tab-button">SEQUENCER</button>
+            <button data-tab="effects" class="tab-button">EFFECTS</button>
+        </nav>
+
+        <main id="tab-sample" class="tab-content">
+            <section id="sample-controls" class="mb-6 p-4 rounded-lg section-bg">
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                    <div class="flex flex-col space-y-2">
+                         <button id="recordSampleButton" class="py-2 px-4 flex items-center justify-center">
+                            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2" fill="#ff0000">
+                                 <circle cx="50" cy="50" r="45"/>
+                            </svg>
+                            RECORD NEW SAMPLE
+                        </button>
+                        <p id="recordingStatus" class="text-sm text-center text-muted-cyber h-4"></p>
+                    </div>
+                    <div class="flex flex-col space-y-2 text-left">
                         <label for="micSelect" class="block text-sm font-medium">INPUT DEVICE:</label>
-                        <div class="flex gap-2 items-center mt-1">
+                        <div class="flex gap-2 items-center">
                             <select id="micSelect"
                                 class="mt-1 block w-full px-3 py-2 bg-black/40 shadow-sm sm:text-sm"></select>
                             <button id="refreshDevicesButton" class="py-2 px-3 text-xs"
                                 title="Refresh input devices">REFRESH</button>
                         </div>
-                        <p id="permissionStatus" class="text-xs text-muted-cyber mt-1"></p>
+                        <p id="permissionStatus" class="text-xs text-muted-cyber mt-1 h-4"></p>
                     </div>
                 </div>
-            </div>
-        </section>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <section id="sampleLibrary" class="md:col-span-1 p-4 rounded-lg section-bg">
-                <h2 class="text-xl font-semibold mb-4">SAMPLE BAY</h2>
-                <div id="sampleList" class="space-y-2 max-h-96 overflow-y-auto pr-2">
-                    <p class="text-muted-cyber p-2">No samples acquired. Press record.</p>
-                </div>
-                <div class="mt-4 flex gap-2">
-                    <button id="exportStemsButton" class="py-2 px-3 text-xs"
-                        title="Export active pattern as individual stems">EXPORT STEMS</button>
-                    <button id="exportMixButton" class="py-2 px-3 text-xs" title="Export full mix as WAV">EXPORT
-                        MIX</button>
-                    <a id="exportDownloadLink" class="hidden"></a>
-                </div>
             </section>
+            <div id="sampleGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                </div>
+        </main>
 
-            <section id="sequencer" class="md:col-span-2 p-4 rounded-lg section-bg">
+        <main id="tab-sequencer" class="tab-content hidden">
+            <section id="sequencer" class="p-4 rounded-lg section-bg">
                 <div class="flex justify-between items-center flex-wrap gap-4 mb-3 sequencer-header-main">
                     <h2 class="text-xl font-semibold">SEQUENCER</h2>
                     <div class="sequencer-header-controls">
@@ -102,7 +95,15 @@
                 <div id="sequencerGrid" class="overflow-x-auto">
                 </div>
             </section>
-        </div>
+        </main>
+
+        <main id="tab-effects" class="tab-content hidden">
+            <section id="effects-controls" class="p-4 rounded-lg section-bg">
+                <h2 class="text-2xl font-semibold mb-6">CHANNEL EFFECTS</h2>
+                <div id="effects-channels-container" class="flex flex-col gap-6 max-w-lg mx-auto">
+                    </div>
+            </section>
+        </main>
     </div>
 
     <div id="sampleModal" class="modal">

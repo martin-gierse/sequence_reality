@@ -1,11 +1,12 @@
 // --- CONFIGURATION ---
 let NUM_TRACKS = 4;
 const NUM_STEPS = 16;
+const NUM_SAMPLE_SLOTS = 8;
 
 // --- DOM ELEMENTS ---
 const recordSampleButton = document.getElementById('recordSampleButton'); 
 const recordingStatus = document.getElementById('recordingStatus');
-const sampleList = document.getElementById('sampleList');
+const sampleGrid = document.getElementById('sampleGrid');
 const sequencerGridContainer = document.getElementById('sequencerGrid');
 const playButton = document.getElementById('playButton');
 const stopButton = document.getElementById('stopButton');
@@ -17,6 +18,11 @@ const permissionStatus = document.getElementById('permissionStatus');
 const prevPresetButton = document.getElementById('prevPresetButton');
 const nextPresetButton = document.getElementById('nextPresetButton');
 const presetNameDisplay = document.getElementById('presetNameDisplay');
+const effectsContainer = document.getElementById('effects-channels-container');
+
+// Tab buttons and content
+const tabButtons = document.querySelectorAll('.tab-button');
+const tabContents = document.querySelectorAll('.tab-content');
 
 // Modal elements
 const sampleModal = document.getElementById('sampleModal');
@@ -26,8 +32,13 @@ const modalNoSamples = document.getElementById('modalNoSamples');
 
 // --- STATE & CONSTANTS ---
 const originalRecordButtonHTML = recordSampleButton.innerHTML;
-let trackVolumes = new Array(NUM_TRACKS).fill(null).map(() => new Tone.Volume(0).toDestination());
-let trackStates = new Array(NUM_TRACKS).fill(null).map(() => ({ muted: false }));
+
+// EFFECTS CHAIN
+let trackReverbs = new Array(NUM_TRACKS).fill(null).map(() => new Tone.Reverb({ decay: 1.5, wet: 0 }).toDestination());
+let trackDelays = new Array(NUM_TRACKS).fill(null).map((_, i) => new Tone.FeedbackDelay("8n", 0.5).connect(trackReverbs[i]));
+let trackVolumes = new Array(NUM_TRACKS).fill(null).map((_, i) => new Tone.Volume(0).connect(trackDelays[i]));
+let trackStates = new Array(NUM_TRACKS).fill(null).map(() => ({ muted: false, reverb: 0, delay: 0 }));
+
 const PRESETS = [
     {
         name: "INIT",
@@ -58,9 +69,9 @@ const PRESETS = [
         name: "REGGAETON",
         bpm: 95,
         pattern: [
-            [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
-            [false, false, false, true, false, false, true, false, false, false, false, true, false, false, true, false],
+            [true, false, false, true, true, false, false, true, true, false, false, true, true, false, false, true],
             [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+            [false, false, true, false, false, false, true, false, false, false, true, false, false, true, false, false],
             [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
         ]
     },
@@ -86,7 +97,7 @@ const PRESETS = [
     }
 ];
 let currentPresetIndex = 0;
-let originalSampleState = null; // For reverting changes in editor
+let originalSampleState = null;
 
 
 // --- HELPER FUNCTIONS ---
@@ -375,7 +386,7 @@ recordSampleButton.addEventListener('click', async () => {
             recordingStatus.textContent = "Processing sample...";
 
             const sampleUrl = URL.createObjectURL(recordingBlob);
-            const sampleName = `SAMPLE_0${recordedSamples.length + 1}`;
+            const sampleName = `SAMPLE_${recordedSamples.length + 1}`;
 
             const arrayBuffer = await recordingBlob.arrayBuffer();
             const audioBuffer = await decodeWithContext(Tone.getContext().rawContext, arrayBuffer);
@@ -390,7 +401,7 @@ recordSampleButton.addEventListener('click', async () => {
                 pitch: 0 
             });
             
-            updateSampleList();
+            renderSampleGrid();
             recordingStatus.textContent = `Sample "${sampleName}" acquired.`;
             console.log("Recording stopped. Sample saved:", sampleName);
             showMessage(`SAMPLE "${sampleName}" ACQUIRED`, "success");
@@ -448,7 +459,7 @@ recordSampleButton.addEventListener('click', async () => {
 });
 
 function updateAllSampleNameDisplays(sampleIndex, newName) {
-    updateSampleList();
+    renderSampleGrid();
     for(let i = 0; i < trackPlayers.length; i++) {
         const p = trackPlayers[i];
         if (p && p._sourceIndex === sampleIndex) {
@@ -456,43 +467,6 @@ function updateAllSampleNameDisplays(sampleIndex, newName) {
             if(sampleNameEl) sampleNameEl.textContent = newName;
         }
     }
-}
-
-function updateSampleList() {
-    sampleList.innerHTML = '';
-    if (recordedSamples.length === 0) {
-        sampleList.innerHTML = '<p class="text-muted-cyber p-2">No samples acquired. Press record.</p>';
-        return;
-    }
-    recordedSamples.forEach((sample, idx) => {
-        const sampleDiv = document.createElement('div');
-        sampleDiv.className = 'sample-item p-2 rounded-sm flex justify-between items-center';
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = sample.name;
-        nameSpan.className = 'text-sm';
-        sampleDiv.appendChild(nameSpan);
-
-        const buttonContainer = document.createElement('div');
-
-        const playButton = document.createElement('button');
-        playButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z" /></svg>`;
-        playButton.className = 'p-1 rounded-full border-0 shadow-none hover:bg-transparent';
-        playButton.title = `Playback ${sample.name}`;
-        playButton.onclick = (e) => {
-            e.stopPropagation();
-            playSamplePreview(sample);
-        };
-        buttonContainer.appendChild(playButton);
-
-        const editButton = document.createElement('button');
-        editButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 7.125 16.875 4.5" /></svg>`;
-        editButton.className = 'p-1 rounded-full border-0 shadow-none hover:bg-transparent';
-        editButton.title = `Edit ${sample.name}`;
-        editButton.onclick = (e) => { e.stopPropagation(); openEditor(sample, idx); };
-        buttonContainer.appendChild(editButton);
-        sampleDiv.appendChild(buttonContainer);
-        sampleList.appendChild(sampleDiv);
-    });
 }
 
 async function playSamplePreview(sample) {
@@ -519,6 +493,51 @@ async function playSamplePreview(sample) {
         showMessage(`Error playing ${sample.name}: ${err.message}`, 'error');
     }
 }
+
+
+function renderSampleGrid() {
+    sampleGrid.innerHTML = '';
+    
+    recordedSamples.forEach((sample, index) => {
+        const slot = document.createElement('div');
+        slot.className = 'sample-slot';
+        slot.onclick = () => openEditor(sample, index);
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'sample-slot-name';
+        nameEl.textContent = sample.name;
+        
+        const waveformEl = document.createElement('div');
+        waveformEl.className = 'sample-slot-waveform';
+
+        slot.appendChild(nameEl);
+        slot.appendChild(waveformEl);
+        sampleGrid.appendChild(slot);
+
+        WaveSurfer.create({
+            container: waveformEl,
+            waveColor: 'rgba(0, 255, 204, 0.5)',
+            progressColor: 'rgba(0, 153, 255, 0.5)',
+            height: 60,
+            barWidth: 1,
+            normalize: true,
+            interact: false,
+            url: sample.url
+        });
+    });
+
+    const emptySlots = NUM_SAMPLE_SLOTS - recordedSamples.length;
+    for(let i = 0; i < emptySlots; i++) {
+        const slot = document.createElement('div');
+        slot.className = 'sample-slot empty';
+        const plus = document.createElement('div');
+        plus.className = 'plus-icon';
+        plus.textContent = '+';
+        slot.appendChild(plus);
+        sampleGrid.appendChild(slot);
+    }
+}
+
 
 function createSequencerGrid() {
     sequencerGridContainer.innerHTML = '';
@@ -623,9 +642,14 @@ function createSequencerGrid() {
     addButton.addEventListener('click', () => {
         NUM_TRACKS++;
         sequencerData.push(new Array(NUM_STEPS).fill(false));
-        trackVolumes.push(new Tone.Volume(0).toDestination());
+        const newReverb = new Tone.Reverb({ decay: 1.5, wet: 0 }).toDestination();
+        const newDelay = new Tone.FeedbackDelay("8n", 0.5).connect(newReverb);
+        const newVolume = new Tone.Volume(0).connect(newDelay);
+        trackVolumes.push(newVolume);
+        trackDelays.push(newDelay);
+        trackReverbs.push(newReverb);
         trackPlayers.push(null);
-        trackStates.push({ muted: false });
+        trackStates.push({ muted: false, reverb: 0, delay: 0 });
         PRESETS.forEach(p => {
             if(p.pattern.length < NUM_TRACKS) {
                 p.pattern.push(new Array(NUM_STEPS).fill(false))
@@ -633,6 +657,7 @@ function createSequencerGrid() {
         });
         createSequencerGrid();
         redrawSequencerGrid();
+        renderEffectsTab();
     });
     addCell.appendChild(addButton);
 
@@ -749,6 +774,7 @@ function setupSequencerPlayback() {
     Tone.Transport.bpm.value = parseInt(tempoInput.value);
 }
 
+// --- WAVEFORM EDITOR ---
 let waveSurfer = null;
 let selectionStart = null;
 let selectionEnd = null;
@@ -767,12 +793,9 @@ const pitchDownButton = document.getElementById('pitchDownButton');
 const pitchUpButton = document.getElementById('pitchUpButton');
 const previewButton = document.getElementById('previewButton');
 const pitchInfo = document.getElementById('pitchInfo');
-const zoomInButton = document.getElementById('zoomInButton');
-const zoomOutButton = document.getElementById('zoomOutButton');
-const zoomResetButton = document.getElementById('zoomResetButton');
-const editorInstructions = document.getElementById('editorInstructions');
 const saveButton = document.getElementById('saveButton');
 const cancelButton = document.getElementById('cancelButton');
+const editorInstructions = document.getElementById('editorInstructions');
 
 async function applyTrimFromSelection() {
     if (currentEditIndex < 0 || !waveSurfer) return false;
@@ -783,7 +806,7 @@ async function applyTrimFromSelection() {
         showMessage('No region selected to apply.', 'error');
         return false;
     }
-
+    
     if (range.end - range.start > 0.005) {
         try {
             const originalBuffer = sample.originalBuffer;
@@ -813,7 +836,7 @@ async function applyTrimFromSelection() {
             await waveSurfer.load(sample.url);
             selectionStart = null;
             selectionEnd = null;
-            sample.trim = null; // Trim is now baked in
+            sample.trim = null;
             showMessage('Trim applied.', 'success');
             return true;
         } catch(e) {
@@ -856,6 +879,7 @@ function cancelChanges() {
         sample.url = originalSampleState.url;
         sample.trim = originalSampleState.trim;
     }
+    renderSampleGrid();
     closeEditor();
 }
 
@@ -916,12 +940,32 @@ async function openEditor(sample, index) {
             tempPlayer.start();
         }
     };
-    saveButton.onclick = () => {
-        if(selectionStart !== null && selectionEnd !== null) {
-            applyTrimFromSelection();
+    saveButton.onclick = async () => {
+        if (selectionStart !== null && selectionEnd !== null) {
+            await applyTrimFromSelection();
         }
+        renderSampleGrid();
         closeEditor();
-    }
+    };
+    trimApplyButton.addEventListener('click', () => applyTrimFromSelection());
+    trimResetButton.addEventListener('click', async () => {
+        if (currentEditIndex < 0) return;
+        const sample = recordedSamples[currentEditIndex];
+        if (sample.buffer === sample.originalBuffer) {
+            showMessage('Sample is already in its original state.', 'info');
+            return;
+        }
+        sample.buffer = sample.originalBuffer;
+        const newBlob = bufferToWaveBlob(sample.buffer);
+        URL.revokeObjectURL(sample.url);
+        sample.url = URL.createObjectURL(newBlob);
+        
+        await waveSurfer.load(sample.url);
+        selectionStart = null;
+        selectionEnd = null;
+        sample.trim = null;
+        showMessage('Sample reset to original.', 'success');
+    });
 
     const wfContainer = document.getElementById('waveformContainer');
     try { waveSurfer && waveSurfer.destroy(); } catch (_) { }
@@ -1128,37 +1172,11 @@ async function openEditor(sample, index) {
 }
 
 const getSelectionRange = () => {
-    if (selectionStart != null) {
-        let end = selectionEnd;
-        if (end == null && waveSurfer) {
-            end = waveSurfer.getDuration();
-        }
-        if (end != null && end > selectionStart) {
-            return { start: selectionStart, end };
-        }
+    if (selectionStart != null && selectionEnd != null && selectionEnd > selectionStart) {
+        return { start: selectionStart, end: selectionEnd };
     }
     return null;
 };
-
-trimApplyButton.addEventListener('click', async () => applyTrimFromSelection());
-
-trimResetButton.addEventListener('click', async () => {
-    if (currentEditIndex < 0) return;
-    const sample = recordedSamples[currentEditIndex];
-    if (sample.buffer === sample.originalBuffer) {
-        showMessage('Sample is already in its original state.', 'info');
-        return;
-    }
-    sample.buffer = sample.originalBuffer;
-    const newBlob = bufferToWaveBlob(sample.buffer);
-    URL.revokeObjectURL(sample.url);
-    sample.url = URL.createObjectURL(newBlob);
-    
-    await waveSurfer.load(sample.url);
-    selectionStart = null;
-    selectionEnd = null;
-    showMessage('Sample reset to original.', 'success');
-});
 
 playButton.addEventListener('click', async () => {
     const ok = await ensureAudioRunning();
@@ -1207,11 +1225,6 @@ tempoInput.addEventListener('change', () => {
     }
 });
 
-const exportStemsButton = document.getElementById('exportStemsButton');
-const exportDownloadLink = document.getElementById('exportDownloadLink');
-const exportMixButton = document.getElementById('exportMixButton');
-// Export functions are unchanged
-
 function redrawSequencerGrid() {
     const steps = document.querySelectorAll('.sequencer-step');
     steps.forEach(step => {
@@ -1239,10 +1252,72 @@ function loadPreset(index) {
     redrawSequencerGrid();
 }
 
+function renderEffectsTab() {
+    effectsContainer.innerHTML = '';
+    for (let i = 0; i < NUM_TRACKS; i++) {
+        const strip = document.createElement('div');
+        strip.className = 'effect-channel-strip';
+        
+        const label = document.createElement('h3');
+        label.textContent = `CHANNEL ${i + 1}`;
+        label.className = 'text-lg mb-2';
+
+        const reverbControl = document.createElement('div');
+        reverbControl.className = 'flex flex-col gap-1';
+        const reverbLabel = document.createElement('label');
+        reverbLabel.textContent = 'Reverb';
+        reverbLabel.className = 'text-sm text-muted-cyber';
+        const reverbSliderEl = document.createElement('input');
+        reverbSliderEl.type = 'range';
+        reverbSliderEl.min = 0;
+        reverbSliderEl.max = 1;
+        reverbSliderEl.step = 0.01;
+        reverbSliderEl.value = trackStates[i].reverb;
+        reverbSliderEl.className = 'effect-slider';
+        reverbSliderEl.dataset.track = i;
+        reverbSliderEl.addEventListener('input', (e) => {
+            const track = parseInt(e.target.dataset.track, 10);
+            const value = parseFloat(e.target.value);
+            trackReverbs[track].wet.value = value;
+            trackStates[track].reverb = value;
+        });
+        reverbControl.appendChild(reverbLabel);
+        reverbControl.appendChild(reverbSliderEl);
+
+        const delayControl = document.createElement('div');
+        delayControl.className = 'flex flex-col gap-1 mt-3';
+        const delayLabel = document.createElement('label');
+        delayLabel.textContent = 'Delay';
+        delayLabel.className = 'text-sm text-muted-cyber';
+        const delaySliderEl = document.createElement('input');
+        delaySliderEl.type = 'range';
+        delaySliderEl.min = 0;
+        delaySliderEl.max = 1;
+        delaySliderEl.step = 0.01;
+        delaySliderEl.value = trackStates[i].delay;
+        delaySliderEl.className = 'effect-slider';
+        delaySliderEl.dataset.track = i;
+        delaySliderEl.addEventListener('input', (e) => {
+            const track = parseInt(e.target.dataset.track, 10);
+            const value = parseFloat(e.target.value);
+            trackDelays[track].wet.value = value;
+            trackStates[track].delay = value;
+        });
+        delayControl.appendChild(delayLabel);
+        delayControl.appendChild(delaySliderEl);
+
+        strip.appendChild(label);
+        strip.appendChild(reverbControl);
+        strip.appendChild(delayControl);
+        effectsContainer.appendChild(strip);
+    }
+}
+
 
 window.onload = () => {
     createSequencerGrid();
-    updateSampleList();
+    renderSampleGrid();
+    renderEffectsTab();
     loadPreset(0);
 
     const startAudioButton = document.createElement('button');
@@ -1271,6 +1346,7 @@ window.onload = () => {
     stopButton.disabled = true;
 
     if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+        initAudio();
         navigator.mediaDevices.addEventListener && navigator.mediaDevices.addEventListener('devicechange', listInputDevices);
         refreshDevicesButton.addEventListener('click', listInputDevices);
         micSelect.addEventListener('change', async (e) => {
@@ -1295,6 +1371,22 @@ window.onload = () => {
     } else {
         permissionStatus.textContent = 'Media devices API unavailable.';
     }
+    
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            
+            const targetTab = button.dataset.tab;
+            tabContents.forEach(content => {
+                if (content.id === `tab-${targetTab}`) {
+                    content.classList.remove('hidden');
+                } else {
+                    content.classList.add('hidden');
+                }
+            });
+        });
+    });
 
     nextPresetButton.addEventListener('click', () => {
         currentPresetIndex = (currentPresetIndex + 1) % PRESETS.length;
