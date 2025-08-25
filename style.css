@@ -494,6 +494,9 @@ select {
     max-width: 70px;
 }
 
+.editor-controls-row {
+    flex-wrap: wrap;
+}
 
 @media (max-width: 768px) {
     .sequencer-header-main {
@@ -501,4 +504,31 @@ select {
         align-items: flex-start;
         gap: 0.75rem;
     }
+}
+
+@media (max-width: 640px) {
+    h1 { font-size: 1.5rem; }
+    h2 { font-size: 1.125rem; }
+    #controls .grid { gap: 0.75rem; }
+    
+    .sequencer-step { 
+        width: 28px; 
+        height: 28px; 
+    }
+    .track-header { 
+        min-width: 100px;
+        font-size: 0.75rem;
+    }
+    .volume-cell {
+        width: 30px;
+        padding: 4px 2px;
+    }
+    .volume-slider {
+        width: 80px; /* Length of the vertical slider on mobile */
+    }
+
+    #sampleList { max-height: 12rem; }
+    #sampleModal .modal-content, #editorModal .modal-content { width: 95%; max-width: 480px; }
+    #waveformContainer { height: 96px; }
+    #startAudioContextButton { padding: 0.75rem 1.25rem; font-size: 1rem; }
 }

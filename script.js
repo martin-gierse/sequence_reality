@@ -1,5 +1,5 @@
 // --- CONFIGURATION ---
-const NUM_TRACKS = 4;
+let NUM_TRACKS = 4;
 const NUM_STEPS = 16;
 
 // --- DOM ELEMENTS ---
@@ -26,17 +26,12 @@ const modalNoSamples = document.getElementById('modalNoSamples');
 
 // --- STATE & CONSTANTS ---
 const originalRecordButtonHTML = recordSampleButton.innerHTML;
-const trackVolumes = new Array(NUM_TRACKS).fill(null).map(() => new Tone.Volume(0).toDestination());
+let trackVolumes = new Array(NUM_TRACKS).fill(null).map(() => new Tone.Volume(0).toDestination());
 const PRESETS = [
     {
         name: "INIT",
         bpm: 120,
-        pattern: [
-            [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
-            [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
-            [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
-            [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
-        ]
+        pattern: Array(4).fill(null).map(() => Array(16).fill(false))
     },
     {
         name: "HOUSE",
@@ -62,9 +57,9 @@ const PRESETS = [
         name: "REGGAETON",
         bpm: 95,
         pattern: [
-            [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
-            [false, false, false, true, false, false, true, false, false, false, false, true, false, false, true, false],
+            [true, false, false, true, true, false, false, true, true, false, false, true, true, false, false, true],
             [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+            [false, false, true, false, false, false, true, false, false, false, true, false, false, true, false, false],
             [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
         ]
     },
@@ -85,7 +80,7 @@ const PRESETS = [
             [true, false, false, false, false, false, false, false, false, false, true, false, false, false, false, false],
             [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
             [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false],
-            [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+            [false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, true]
         ]
     }
 ];
@@ -166,7 +161,7 @@ let mic = null;
 let recorder = null;
 let isRecording = false;
 const recordedSamples = [];
-const trackPlayers = new Array(NUM_TRACKS).fill(null);
+let trackPlayers = new Array(NUM_TRACKS).fill(null);
 let sequencerData = Array(NUM_TRACKS).fill(null).map(() => Array(NUM_STEPS).fill(false));
 let currentTrackToLoad = -1;
 let currentStepIndicator = -1;
@@ -483,6 +478,7 @@ async function playSamplePreview(sample) {
     }
 }
 
+
 function createSequencerGrid() {
     sequencerGridContainer.innerHTML = '';
     const table = document.createElement('table');
@@ -534,7 +530,7 @@ function createSequencerGrid() {
         volumeSlider.min = -20;
         volumeSlider.max = 20;
         volumeSlider.step = 1;
-        volumeSlider.value = 0;
+        volumeSlider.value = trackVolumes[i] ? trackVolumes[i].volume.value : 0;
         volumeSlider.dataset.track = i;
         volumeSlider.addEventListener('input', (e) => {
             const trackIndex = parseInt(e.target.dataset.track, 10);
@@ -555,6 +551,27 @@ function createSequencerGrid() {
             stepCell.appendChild(stepDiv);
         }
     }
+
+    const tfoot = table.createTFoot();
+    const footerRow = tfoot.insertRow();
+    const addCell = footerRow.insertCell();
+    addCell.colSpan = NUM_STEPS + 2; // +2 for track header and volume
+    addCell.className = 'p-2 text-center';
+    const addButton = document.createElement('button');
+    addButton.textContent = '+ ADD CHANNEL';
+    addButton.className = 'text-xs py-1 px-2 w-full';
+    addButton.id = 'addChannelButton';
+    addButton.addEventListener('click', () => {
+        NUM_TRACKS++;
+        sequencerData.push(new Array(NUM_STEPS).fill(false));
+        trackVolumes.push(new Tone.Volume(0).toDestination());
+        trackPlayers.push(null);
+        PRESETS.forEach(p => p.pattern.push(new Array(NUM_STEPS).fill(false)));
+        createSequencerGrid();
+        redrawSequencerGrid();
+    });
+    addCell.appendChild(addButton);
+
     sequencerGridContainer.appendChild(table);
 }
 
@@ -786,13 +803,14 @@ async function openEditor(sample, index) {
     wfContainer.insertBefore(waveTarget, overlay);
 
     try {
+        const waveformHeight = window.innerWidth < 640 ? 96 : 120;
         const wsOptions = {
             container: waveTarget,
             waveColor: 'rgba(0,255,204,0.35)',
             progressColor: 'rgba(0,153,255,0.7)',
             cursorColor: '#00ffcc',
             barWidth: 1,
-            height: 120,
+            height: waveformHeight,
             normalize: true,
             audioContext: Tone.getContext().rawContext
         };
@@ -1058,24 +1076,27 @@ tempoInput.addEventListener('change', () => {
     }
 });
 
-const exportStemsButton = document.getElementById('exportStemsButton');
-const exportDownloadLink = document.getElementById('exportDownloadLink');
-const exportMixButton = document.getElementById('exportMixButton');
-// ... export functions are unchanged and very long, so they are omitted for clarity. They can be pasted from a previous complete version.
-
 function redrawSequencerGrid() {
     const steps = document.querySelectorAll('.sequencer-step');
     steps.forEach(step => {
         const track = parseInt(step.dataset.track, 10);
         const stepIndex = parseInt(step.dataset.step, 10);
-        const isActive = sequencerData[track][stepIndex];
-        step.classList.toggle('active', isActive);
+        if (sequencerData[track]) {
+            const isActive = sequencerData[track][stepIndex];
+            step.classList.toggle('active', isActive);
+        }
     });
 }
 
 function loadPreset(index) {
     const preset = PRESETS[index];
-    sequencerData = JSON.parse(JSON.stringify(preset.pattern)); // Deep copy
+    if (preset.pattern.length < NUM_TRACKS) {
+        const diff = NUM_TRACKS - preset.pattern.length;
+        for (let i = 0; i < diff; i++) {
+            preset.pattern.push(new Array(NUM_STEPS).fill(false));
+        }
+    }
+    sequencerData = JSON.parse(JSON.stringify(preset.pattern.slice(0, NUM_TRACKS)));
     tempoInput.value = preset.bpm;
     tempoInput.dispatchEvent(new Event('change'));
     presetNameDisplay.textContent = preset.name;
@@ -1148,4 +1169,3 @@ window.onload = () => {
         loadPreset(currentPresetIndex);
     });
 };
-
